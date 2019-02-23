@@ -1,8 +1,9 @@
 # DuckDNS Updater Plugin for Engima2
 This Plugin will allow your enigma2 box to update your DuckDNS hostname(s) with the IP address it is using
+Can be set to update from 5 minutes up to 120 minutes.
 
 # Features
-Will update upto the maximum 5 hostnames
+Will update upto the standard maximum 5 hostnames
 Setup from coniguration screen or by XML located in /etc/enigma2/
 
 ## Screenshots:
