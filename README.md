@@ -6,9 +6,7 @@ Will update upto the maximum 5 hostnames
 Setup from coniguration screen or by XML located in /etc/enigma2/
 
 ## Screenshots:
-Plugin Icon Image:
 ![Plugin Icon](https://i.ibb.co/R7GDT8M/5002-0-1-8-B43-1821-B0-FE-0-0-0-0-20190223190416.jpg)
-Screenshot of Internal of Plugin
 ![Plugin Screenshot](https://i.ibb.co/rcbdjCY/5002-0-1-8-B43-1821-B0-FE-0-0-0-0-20190223190454.jpg)
 
 ### Installation
