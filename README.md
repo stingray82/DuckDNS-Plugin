@@ -18,5 +18,5 @@ Can now be enabled and disabled using the enable and disable options in plugin.
 Install the latest release using this command
 
 ```sh
-$ opkg install https://github.com/stingray82/DuckDNS-Plugin/releases/download/v0.11/enigma2-plugin-extensions-duckdnsupdater_0.11_all.ipk
+$ opkg install https://github.com/stingray82/DuckDNS-Plugin/releases/download/v0.12/enigma2-plugin-extensions-duckdnsupdater_0.12_all.ipk
 ```
