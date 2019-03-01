@@ -23,14 +23,15 @@ try:
     from urllib.request import urlopen, URLError
 except ImportError:
     from urllib2 import Request, urlopen, URLError
-
 import shutil
 autoStartTimer = None
 _session = None
-version = '0.1'
+IPv4 = None
+debug = 0
+version = '0.12'
 config.plugins.duckdns = ConfigSubsection()
 config.plugins.duckdns.enable = ConfigYesNo(default=False)
-config.plugins.duckdns.updateinterval = ConfigSelectionNumber(default=15, min=5, max=120, stepwidth=5)
+config.plugins.duckdns.updateinterval = ConfigSelectionNumber(default=15, min=5, max=180, stepwidth=5)
 config.plugins.duckdns.hostname = ConfigText(default='', fixed_size=False)
 config.plugins.duckdns.morehostname = ConfigYesNo(default=False)
 config.plugins.duckdns.hostname2 = ConfigText(default='', fixed_size=False)
@@ -39,6 +40,8 @@ config.plugins.duckdns.hostname4 = ConfigText(default='', fixed_size=False)
 config.plugins.duckdns.hostname5 = ConfigText(default='', fixed_size=False)
 config.plugins.duckdns.token = ConfigText(default='', fixed_size=False)
 config.plugins.duckdns.usexml = ConfigYesNo(default=False)
+config.plugins.duckdns.last_ip = ConfigText()
+
 
 class duckdnsConfig(ConfigListScreen, Screen):
     skin = '\n    <screen position="center,center" size="600,460" title="DuckDNS Updater"  >    \n       <ePixmap pixmap="skin_default/buttons/red.png" position="0,0" size="140,40" transparent="1" alphatest="on" />\n    <ePixmap pixmap="skin_default/buttons/green.png" position="140,0" size="140,40" transparent="1" alphatest="on" />\n    <ePixmap pixmap="skin_default/buttons/yellow.png" position="280,0" size="140,40" transparent="1" alphatest="on" />\n    <ePixmap pixmap="skin_default/buttons/blue.png" position="420,0" size="140,40" transparent="1" alphatest="on" />\n    <widget name="key_red" position="0,0" size="140,40" valign="center" halign="center" zPosition="4"  foregroundColor="white" font="Regular;20" transparent="1" shadowColor="background" shadowOffset="-2,-2" />\n    <widget name="key_green" position="140,0" size="140,40" valign="center" halign="center" zPosition="4"  foregroundColor="white" font="Regular;20" transparent="1" shadowColor="background" shadowOffset="-2,-2" />\n    <widget name="key_yellow" position="280,0" size="140,40" valign="center" halign="center" zPosition="4"  foregroundColor="white" font="Regular;20" transparent="1" shadowColor="background" shadowOffset="-2,-2" />\n    <widget name="key_blue" position="420,0" size="140,40" valign="center" halign="center" zPosition="4"  foregroundColor="white" font="Regular;20" transparent="1" shadowColor="background" shadowOffset="-2,-2" />\n    <ePixmap position="562,30" size="35,25" pixmap="skin_default/buttons/key_menu.png" alphatest="on" />\n    <widget name="config" position="10,60" size="590,450" scrollbarMode="showOnDemand" />\n  <widget name="statusbar" position="10,410" size="500,20" font="Regular;18" /> \n <widget name="upgradeinfo" position="10,430" size="565,20" font="Bold;18" />\n\t\t\t\t </screen>'
@@ -63,6 +66,7 @@ class duckdnsConfig(ConfigListScreen, Screen):
         self.XMLinfo()
         self.init_config()
         self.create_setup()
+        self.showip()
 
     def init_config(self):
 
@@ -135,7 +139,7 @@ class duckdnsConfig(ConfigListScreen, Screen):
         self.close()
 
     def openMenu(self):
-        menu = [(_('Show log'), self.showLog)]
+        menu = [(_('Show log'), self.showLog),(_('Change Log'), self.changelog)]
         text = _('Select action')
 
         def setAction(choice):
@@ -176,6 +180,14 @@ class duckdnsConfig(ConfigListScreen, Screen):
 
     def showLog(self):
         self.session.open(DuckDNSLog)
+
+    def changelog(self):
+        change = '\n V0.12: \n Added check to identify if the IP address has changed \n Added Debug for testing \n Added Changelog screen \n Added Current / Last IP update meaning no need to run after reboot \n V0.11: \n Inital Release \n V0.1: \n Creation of Plugin  '
+        self.session.open(MessageBox, change, type=MessageBox.TYPE_INFO)
+        
+    def showip(self):
+        if config.plugins.duckdns.last_ip:
+            self['statusbar'].setText('Currently or Last Registered IP: {}'.format(config.plugins.duckdns.last_ip.value))        
 
 
 class DuckDNSLog(Screen):
@@ -228,13 +240,15 @@ class AutoStartTimer:
         self.update()
 
     def get_wake_time(self):
-        print >> log, '[DUCKDNS] AutoStartTimer -> get_wake_time'
+        if debug == 1:
+            print >> log, '[DUCKDNS] AutoStartTimer -> get_wake_time'
         interval = int(config.plugins.duckdns.updateinterval.value)
         nowt = time.time()
         return int(nowt) + interval * 60
 
     def update(self):
-        print >> log, '[DUCKDNS] AutoStartTimer -> update'
+        if debug == 1:
+            print >> log, '[DUCKDNS] AutoStartTimer -> update'
         self.timer.stop()
         wake = self.get_wake_time()
         nowt = time.time()
@@ -248,14 +262,15 @@ class AutoStartTimer:
         else:
             wake = -1
         print >> log, '[DUCKDNS] next wake up time {} (now={})'.format(time.asctime(time.localtime(wake)), time.asctime(time.localtime(now)))
+        global debug
+        debug = 0
         return wake
 
     def on_timer(self):
         self.timer.stop()
         now = int(time.time())
         wake = now
-        print >> log, '[DUCKDNS] on_timer occured at {}'.format(now)
-        print >> log, '[DUCKDNS] Stating DUCKDNS Update as Scheduled'
+        print >> log, '[DUCKDNS] Timer Run {}'.format(time.asctime(time.localtime(now)))
         if wake - now < 60:
             try:
                 start_update()
@@ -265,14 +280,16 @@ class AutoStartTimer:
         self.update()
 
     def get_status(self):
-        print >> log, '[DUCKDNS] AutoStartTimer -> getStatus'
+        if debug == 1:
+            print >> log, '[DUCKDNS] AutoStartTimer -> getStatus'
 
 
 def autostart(reason, session = None, **kwargs):
     global autoStartTimer
     global _session
     urllib._urlopener = AppUrlOpener()
-    print >> log, '[DUCKDNS] autostart {} occured at {}'.format(reason, time.time())
+    if debug == 1:
+        print >> log, '[DUCKDNS] autostart {} occured at {}'.format(reason, time.time())
     if reason == 0 and _session is None:
         if session is not None:
             _session = session
@@ -284,28 +301,57 @@ def autostart(reason, session = None, **kwargs):
 
 
 def get_next_wakeup():
-    print >> log, '[DUCKDNS] get_next_wakeup'
+    if debug == 1:
+        print >> log, '[DUCKDNS] get_next_wakeup'
     return -1
 
 
 def start_update():
-    nowt = time.time()
-    now = int(nowt)
-    print >> log, '[DUCKDNS] Update Started at ({})'.format(time.asctime(time.localtime(now)))
-    hostname = config.plugins.duckdns.hostname.value
-    token = config.plugins.duckdns.token.value
-    if config.plugins.duckdns.morehostname.value:
-        domains = '{0},{1},{2},{3},{4}'.format(config.plugins.duckdns.hostname.value, config.plugins.duckdns.hostname2.value, config.plugins.duckdns.hostname3.value, config.plugins.duckdns.hostname4.value, config.plugins.duckdns.hostname4.value)
-        url = 'https://www.duckdns.org/update?domains={0}&token={1}&verbose=true'.format(domains, token)
+    if config.plugins.duckdns.enable.value == True:
+        global IPv4
+        global debug
+        IPv4 = config.plugins.duckdns.last_ip.value
+        ''' The following is for debug & Testing IP Changes without them changing'''
+        PATH='/usr/lib/enigma2/python/Plugins/Extensions/DuckDNSUpdater/debug.txt'
+        if os.path.isfile(PATH) and os.access(PATH, os.R_OK):
+            with open('/usr/lib/enigma2/python/Plugins/Extensions/DuckDNSUpdater/debug.txt', 'r') as myfile:
+                text = myfile.read().decode('UTF-8').strip()
+                IPv4 = text
+                debug = 1
+                print >> log, '[DUCKDNS] IP Debug Override Activated'
+        ''' end of debug section '''
+        url = 'http://myexternalip.com/raw'
+        ip = urlopen(url).read().decode('utf-8')
+        ''' The following is for debug & Testing IP Changes without them changing'''
+        if debug == 1:
+            print >> log, '[DUCKDNS] check IP ({}) IPV4 {}'.format(ip, IPv4)
+            ''' end of debug section '''
+        if ip == IPv4:
+            print >> log, '[DUCKDNS] IP Status Unchanged ({})'.format(IPv4)
+        else:
+            nowt = time.time()
+            now = int(nowt)
+            print >> log, '[DUCKDNS] Update Started at ({})'.format(time.asctime(time.localtime(now)))
+            hostname = config.plugins.duckdns.hostname.value
+            token = config.plugins.duckdns.token.value
+            if config.plugins.duckdns.morehostname.value:
+                domains = '{0},{1},{2},{3},{4}'.format(config.plugins.duckdns.hostname.value, config.plugins.duckdns.hostname2.value, config.plugins.duckdns.hostname3.value, config.plugins.duckdns.hostname4.value, config.plugins.duckdns.hostname4.value)
+                url = 'https://www.duckdns.org/update?domains={0}&token={1}&verbose=true'.format(domains, token)
+            else:
+                url = 'https://www.duckdns.org/update?domains={0}&token={1}&verbose=true'.format(hostname, token)
+            updatetext = urlopen(url).read().decode('UTF-8').strip()
+            updatestatus, IPv4, IPv6, changestatus = updatetext.split('\n')
+            print >> log, '[DUCKDNS] OK = Good) (KO = Failed): Status ({})'.format(updatestatus)
+            print >> log, '[DUCKDNS] Updated IPv4 IP Address If used: {}'.format(IPv4)
+            print >> log, '[DUCKDNS] Updated IPv6 IP Address If used: {}'.format(IPv6)
+            print >> log, '[DUCKDNS] [Update Status] IP Address ({})'.format(changestatus)
+            print >> log, '[DUCKDNS] Update Finished at ({})'.format(time.asctime(time.localtime(now)))
+            config.plugins.duckdns.last_ip.value = IPv4
+            config.plugins.duckdns.last_ip.save()
     else:
-        url = 'https://www.duckdns.org/update?domains={0}&token={1}&verbose=true'.format(hostname, token)
-    updatetext = urlopen(url).read().decode('UTF-8').strip()
-    updatestatus, IPv4, IPv6, changestatus = updatetext.split('\n')
-    print >> log, '[DUCKDNS] OK = Good) (KO = Failed): Status ({})'.format(updatestatus)
-    print >> log, '[DUCKDNS] Updated IPv4 IP Address If used: {}'.format(IPv4)
-    print >> log, '[DUCKDNS] Updated IPv6 IP Address If used: {}'.format(IPv6)
-    print >> log, '[DUCKDNS] [Update Status] IP Address ({})'.format(changestatus)
-    print >> log, '[DUCKDNS] Update Finished at ({})'.format(time.asctime(time.localtime(now)))
+        print >> log, '[DUCKDNS] Updates are not enabled'
+
+
 
 
 def main(session, **kwargs):
