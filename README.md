@@ -19,5 +19,5 @@ Can now notify you of change using Pushover if enabled and setup
 Install the latest release using this command
 
 ```sh
-$ opkg install https://github.com/stingray82/DuckDNS-Plugin/releases/download/v0.13/enigma2-plugin-extensions-duckdnsupdater_0.13_all.ipk
+$ opkg install https://github.com/stingray82/DuckDNS-Plugin/releases/download/v1.3/enigma2-plugin-extensions-duckdnsupdater_0.13_all.ipk
 ```
