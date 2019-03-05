@@ -28,7 +28,7 @@ autoStartTimer = None
 _session = None
 IPv4 = None
 debug = 0
-version = '0.12'
+version = '0.13'
 config.plugins.duckdns = ConfigSubsection()
 config.plugins.duckdns.enable = ConfigYesNo(default=False)
 config.plugins.duckdns.updateinterval = ConfigSelectionNumber(default=15, min=5, max=180, stepwidth=5)
@@ -41,6 +41,10 @@ config.plugins.duckdns.hostname5 = ConfigText(default='', fixed_size=False)
 config.plugins.duckdns.token = ConfigText(default='', fixed_size=False)
 config.plugins.duckdns.usexml = ConfigYesNo(default=False)
 config.plugins.duckdns.last_ip = ConfigText()
+config.plugins.duckdns.pushoverenable = ConfigYesNo(default=False)
+config.plugins.duckdns.apitoken = ConfigText(default='', fixed_size=False)
+config.plugins.duckdns.userkey = ConfigText(default='', fixed_size=False)
+
 
 
 class duckdnsConfig(ConfigListScreen, Screen):
@@ -92,7 +96,10 @@ class duckdnsConfig(ConfigListScreen, Screen):
         self.cfg_hostname4 = getConfigListEntry('DuckDNS Hostname No.4:', self.duckdns.hostname4)
         self.cfg_hostname5 = getConfigListEntry('DuckDNS Hostname No.5:', self.duckdns.hostname5)
         self.cfg_token = getConfigListEntry('DuckDNS token:', self.duckdns.token)
-        self.cfg_usexml = getConfigListEntry('Use Config XML File', self.duckdns.usexml)
+        self.cfg_usexml = getConfigListEntry('Use Config XML File?', self.duckdns.usexml)
+        self.cfg_pushoverenable = getConfigListEntry('Enable Pushover Update:', self.duckdns.pushoverenable)
+        self.cfg_apitoken = getConfigListEntry('Pushover API Token:', self.duckdns.apitoken)
+        self.cfg_userkey = getConfigListEntry('Pushover User Key:', self.duckdns.userkey)
 
     def create_setup(self):
         list = [self.cfg_enable]
@@ -101,12 +108,17 @@ class duckdnsConfig(ConfigListScreen, Screen):
             list.append(self.cfg_hostname)
             list.append(self.cfg_token)
             list.append(self.cfg_usexml)
-            list.append(self.cfg_morehostname)
+            list.append(self.cfg_morehostname)           
             if self.duckdns.morehostname.value:
                 list.append(self.cfg_hostname2)
                 list.append(self.cfg_hostname3)
                 list.append(self.cfg_hostname4)
                 list.append(self.cfg_hostname5)
+            list.append(self.cfg_pushoverenable)
+            if self.duckdns.pushoverenable.value:
+                list.append(self.cfg_apitoken)
+                list.append(self.cfg_userkey)           
+
         self['config'].list = list
         self['config'].l.setList(list)
 
@@ -115,6 +127,8 @@ class duckdnsConfig(ConfigListScreen, Screen):
         if cur in (self.cfg_enable, self.cfg_updateinterval):
             self.create_setup()
         if cur in (self.cfg_enable, self.cfg_morehostname):
+            self.create_setup()
+        if cur in (self.cfg_enable, self.cfg_pushoverenable):
             self.create_setup()
 
     def keyLeft(self):
@@ -155,17 +169,21 @@ class duckdnsConfig(ConfigListScreen, Screen):
         global hostname5
         global hostname
         global token
+        global apitoken
+        global userkey
         if config.plugins.duckdns.usexml.value:
             try:
-                with open('/etc/enigma2/duckdns.xml') as file:
+                with open('/etc/enigma2/DuckDNSUpdater/duckdns.xml') as file:
                     tree = ElementTree()
-                    xml = tree.parse('/etc/enigma2/duckdns.xml')
+                    xml = tree.parse('/etc/enigma2/DuckDNSUpdater/duckdns.xml')
                     token = xml.findtext('token')
                     hostname = xml.findtext('hostname')
                     hostname2 = xml.findtext('hostname2')
                     hostname3 = xml.findtext('hostname3')
                     hostname4 = xml.findtext('hostname4')
                     hostname5 = xml.findtext('hostname5')
+                    apitoken = xml.findtext('apitoken')                    
+                    userkey = xml.findtext('userkey')
                     if config.plugins.duckdns.usexml.value:
                         config.plugins.duckdns.token.value = token
                         config.plugins.duckdns.hostname.value = hostname
@@ -173,10 +191,12 @@ class duckdnsConfig(ConfigListScreen, Screen):
                         config.plugins.duckdns.hostname3.value = hostname3
                         config.plugins.duckdns.hostname4.value = hostname4
                         config.plugins.duckdns.hostname5.value = hostname5
+                        config.plugins.duckdns.apitoken.value = apitoken
+                        config.plugins.duckdns.userkey.value = userkey
                     else:
                         print >> log, ' [DUCKDNS] Config File is not in use'
             except IOError as e:
-                print >> log, "[DUCKDNS] Config File couldn't be read"
+                print >> log, "[DUCKDNS] Config File couldn't be read"        
 
     def showLog(self):
         self.session.open(DuckDNSLog)
@@ -348,6 +368,19 @@ def start_update():
             print >> log, '[DUCKDNS] Update Finished at ({})'.format(time.asctime(time.localtime(now)))
             config.plugins.duckdns.last_ip.value = IPv4
             config.plugins.duckdns.last_ip.save()
+            if config.plugins.duckdns.pushoverenable.value:
+                message = 'Your IP address has now changed: New IP Address = {}'.format(IPv4)
+                api = config.plugins.duckdns.apitoken.value
+                userkey =  config.plugins.duckdns.userkey.value
+                import httplib, urllib
+                conn = httplib.HTTPSConnection("api.pushover.net:443")
+                conn.request("POST", "/1/messages.json",
+                  urllib.urlencode({
+                    "token": api,
+                    "user": userkey,
+                    "message": message,
+                  }), { "Content-type": "application/x-www-form-urlencoded" })
+                conn.getresponse()
     else:
         print >> log, '[DUCKDNS] Updates are not enabled'
 
